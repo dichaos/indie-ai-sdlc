@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "homepulse-rag": {
+      "command": "/ABS/PATH/TO/homepulse/.venv/bin/python",
+      "args": ["/ABS/PATH/TO/homepulse/ai-automations/mcp/hybrid_rag_mcp.py"],
+      "env": {
+        "REPO_ROOT": "/ABS/PATH/TO/homepulse"
+      }
+    }
+  }
+}

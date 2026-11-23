@@ -1,0 +1,19 @@
+# Generic Semgrep rules for HomePulse (adapt `languages:` to your ADR-001 stack)
+rules:
+  - id: homepulse-unauthenticated-device-mutation
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Security Violation: State-mutating device-control routes (/api/devices/) MUST enforce
+      explicit authentication and the `HomePulse.DeviceControl` scope before executing commands.
+    patterns:
+      - pattern-regex: "(?i)(POST|PUT|DELETE)[^\\n]*/api/devices/"
+      - pattern-not-regex: "(?i)(RequireScope|HomePulse\\.DeviceControl|require_scope)"
+
+  - id: homepulse-no-float-energy-billing
+    languages: [generic]
+    severity: WARNING
+    message: >-
+      Domain Rule (#ai-pin): Represent power and energy quantities as 64-bit integer milliwatts
+      or milliwatt-hours, never floating-point types, to prevent tariff rounding drift.
+    pattern-regex: "(?i)\\b(float|double|float32|float64)\\s+[a-z0-9_]*(watt|kwh|energy|power|tariff|solar)[a-z0-9_]*"

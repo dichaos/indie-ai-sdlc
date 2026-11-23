@@ -1,0 +1,17 @@
+{
+  "ast-pre-write-gatekeeper": {
+    "enabled": true,
+    "PreToolUse": [
+      {
+        "matcher": "write_file|edit_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python ../ai-automations/hooks/pre_write_ast_gate.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

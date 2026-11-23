@@ -1,0 +1,45 @@
+# Minimal Local Observability Stack for HomePulse (£0.00 Cloud Cost)
+# Run with: docker compose -f docker-compose.observability.yml up -d
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: homepulse-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.2.1
+    container_name: homepulse-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: homepulse-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=homepulse-local
+    depends_on:
+      - prometheus
+      - loki
+    restart: unless-stopped
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    container_name: homepulse-pg-exporter
+    ports:
+      - "9187:9187"
+    environment:
+      - DATA_SOURCE_NAME=postgresql://homepulse:homepulse@host.docker.internal:5432/homepulse?sslmode=disable
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
