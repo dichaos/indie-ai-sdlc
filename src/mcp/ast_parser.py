@@ -1,8 +1,8 @@
-"""Deterministic Tree-Sitter AST Parser & Guardrail Inspector for HomePulse.
+"""Deterministic Tree-Sitter AST Parser & Guardrail Inspector.
 
-Provides sub-12ms AST analysis for both C# and TypeScript/TSX:
+Provides sub-12ms AST analysis for source files:
 1. Exact top-level type extraction ignoring comments and string literals.
-2. Strict modularity check (SA1402: max 1 top-level type per source file).
+2. Strict modularity check (max 1 top-level type per domain/backend file).
 3. Accurate import/using extraction for architectural boundary checks.
 4. Direct database connection instantiation detection (DIP guardrail).
 5. Proper UTF-8 byte-offset decoding (safe with non-ASCII characters).
@@ -244,7 +244,7 @@ def audit_source_guardrails(
     code: str,
     banned_imports: List[str] | None = None,
 ) -> Dict[str, Any]:
-    """Audits C# or TypeScript/TSX code against HomePulse architectural guardrails.
+    """Audits source code against architectural and modularity guardrails.
 
     Returns a dictionary with keys: target_path, passed, violation_count, violations, top_level_types.
     """
@@ -261,21 +261,21 @@ def audit_source_guardrails(
         analysis = AST_ENGINE.parse_csharp(code)
 
         if analysis.has_parse_errors:
-            violations.append(f"Syntax Error: C# parser reported syntax errors in '{norm_path}'.")
+            violations.append(f"Syntax Error: Parser reported syntax errors in '{norm_path}'.")
 
         for imp in analysis.imports:
             for banned in cs_banned:
                 if imp == banned or imp.startswith(f"{banned}."):
                     violations.append(
-                        f"Banned Import Violation in '{norm_path}': '{imp}' is forbidden by HomePulse ADR-001."
+                        f"Banned Import Violation in '{norm_path}': '{imp}' is forbidden by ADR-001."
                     )
 
-        # Enforce layer boundary: Domain layer must not depend on EF Core or ASP.NET
-        if "HomePulse.Domain/" in norm_path:
+        # Enforce layer boundary: Domain layer must not depend on ORM or HTTP frameworks
+        if "/Domain/" in f"/{norm_path}" or ".Domain/" in norm_path:
             for imp in analysis.imports:
                 if imp.startswith("Microsoft.EntityFrameworkCore") or imp.startswith("Microsoft.AspNetCore"):
                     violations.append(
-                        f"Layer Boundary Violation in '{norm_path}': HomePulse.Domain cannot import '{imp}'."
+                        f"Layer Boundary Violation in '{norm_path}': Domain layer cannot import '{imp}'."
                     )
 
         top_types = [t for t in analysis.types if t.is_top_level]

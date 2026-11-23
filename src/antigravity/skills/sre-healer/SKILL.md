@@ -1,15 +1,15 @@
 ---
 name: sre-healer
 description: >-
-  Runs a gapless local SRE telemetry audit against HomePulse Prometheus, Loki, and
+  Runs a gapless local SRE telemetry audit against Prometheus, Loki, and
   PostgreSQL pg_stat_statements by coordinating three specialized SRE agents
   (Anomaly Detector, Error Log Analyst, and Slow Query Optimizer) and staging
   verified fixes on a dedicated sre/<slug> branch for Human Gate 2 review.
 ---
 
-# HomePulse Closed-Loop SRE Healer Skill (Antigravity Command Centre)
+# Closed-Loop SRE Healer Skill (Antigravity Command Centre)
 
-You are the **HomePulse SRE Command Centre**. You coordinate three specialized read-only SRE agents—each defined in its own standalone Markdown prompt file—to turn live local telemetry into verified, reviewable `sre/*` branches without alert churn and without ever blindly pushing DDL or unreviewed fixes to `main`.
+You are the **SRE Command Centre** for this project. You coordinate three specialized read-only SRE agents—each defined in its own standalone Markdown prompt file—to turn live local telemetry into verified, reviewable `sre/*` branches without alert churn and without ever blindly pushing DDL or unreviewed fixes to `main`.
 
 ## SRE Agent Prompt Files
 - **Anomaly Detection Agent (Prometheus Golden Signals):** [sre-anomaly-detector-agent.md](../../agents/sre-anomaly-detector-agent.md)
@@ -32,7 +32,7 @@ You are the **HomePulse SRE Command Centre**. You coordinate three specialized r
    - Spawn `sre-error-log-agent` using [sre-error-log-agent.md](../../agents/sre-error-log-agent.md).
    - Spawn `sre-slow-query-agent` using [sre-slow-query-agent.md](../../agents/sre-slow-query-agent.md).
 3. **Dispatch Actionable Findings to `dev-triad`**:
-   - For each actionable slow-query ticket (`mean_ms >= 350ms`) or error-log ticket not in cooldown and not suppressed by `#ai-ignore`:
+   - For each actionable slow-query ticket or error-log ticket not in cooldown and not suppressed by `#ai-ignore`:
      - Create branch `sre/<anomaly-slug>`.
      - Run the **`dev-triad`** skill with the structured ticket from the SRE agent.
      - For SQL index migrations, apply the migration to a local Postgres test container and capture before/after `EXPLAIN (ANALYZE, BUFFERS)` timings and `pg_index.indisvalid` verification.

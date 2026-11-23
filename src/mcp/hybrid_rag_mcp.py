@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local Zero-Cloud Hybrid RAG & AST Guardrail stdio MCP Server for HomePulse.
+"""Local Zero-Cloud Hybrid RAG & AST Guardrail stdio MCP Server.
 
 Runs locally over stdio inside Antigravity (registered in ~/.gemini/config/mcp_config.json).
 Requires ZERO external API keys, vector databases, or cloud services:
@@ -7,7 +7,7 @@ Requires ZERO external API keys, vector databases, or cloud services:
 - scikit-learn TF-IDF (1-2 gram) cosine similarity (conceptual PRD/ADR search)
 - Reciprocal Rank Fusion (RRF) with priority boosting for #ai-pin / #ai-ignore decisions
 - Automatic mtime-based re-indexing when workspace files change
-- Tree-Sitter AST pre-write guardrail validation for C# and TypeScript/TSX
+- Tree-Sitter AST pre-write guardrail validation
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ PRUNED_DIRS = {
     "__pycache__",
 }
 
-mcp = FastMCP("homepulse-rag")
+mcp = FastMCP("codebase-rag")
 
 
 @dataclass
@@ -358,7 +358,7 @@ ENGINE = HybridRagEngine(REPO_ROOT)
 
 @mcp.tool()
 def search_hybrid_rag(query: str, category: str = "all", top_k: int = 5) -> str:
-    """Searches HomePulse PRD, ADRs, Living Memory decisions (#ai-pin/#ai-ignore), and AST code symbols."""
+    """Searches project PRD, ADRs, Living Memory decisions (#ai-pin/#ai-ignore), and AST code symbols."""
     hits = ENGINE.search_hybrid(query=query, category=category, top_k=top_k)
     return json.dumps(
         {
@@ -373,43 +373,42 @@ def search_hybrid_rag(query: str, category: str = "all", top_k: int = 5) -> str:
 
 @mcp.tool()
 def get_canonical_exemplar(pattern_type: str) -> str:
-    """Returns canonical file paths, mandatory rules, and live code previews for HomePulse patterns."""
+    """Returns canonical file paths, mandatory rules, and live code previews for project patterns."""
     exemplars = {
         "domain-model": {
-            "path": "src/HomePulse.Domain/Models/SensorReading.cs",
+            "path": "src/Domain/Models/SampleEntity.cs",
             "rules": [
-                "Strictly 1 top-level C# type per file (SA1402).",
-                "Zero references to Microsoft.EntityFrameworkCore or Microsoft.AspNetCore.",
-                "Represent energy/power measurements as integer milliwatts (long) to avoid float drift.",
+                "Strictly 1 top-level type per domain file.",
+                "Zero references to persistence/ORM or HTTP framework layers.",
+                "Use exact integer or decimal types for financial/measurement values (avoid float drift).",
             ],
         },
         "repository": {
-            "path": "src/HomePulse.Infrastructure/Repositories/TelemetryRepository.cs",
+            "path": "src/Infrastructure/Repositories/SampleRepository.cs",
             "rules": [
-                "Inject IDbConnectionFactory; never instantiate NpgsqlConnection directly.",
-                "Parameterize all SQL queries and filter by household_id.",
+                "Inject IDbConnectionFactory; never instantiate raw DB connections directly.",
+                "Parameterize all SQL queries and enforce tenant/owner scoping.",
             ],
         },
         "api-controller": {
-            "path": "src/HomePulse.Api/Controllers/DeviceControlController.cs",
+            "path": "src/Api/Controllers/SampleController.cs",
             "rules": [
-                "Every state-mutating POST/PUT/DELETE endpoint MUST carry [Authorize] and [RequireScope(...)].",
+                "Every state-mutating POST/PUT/DELETE endpoint MUST enforce authentication and explicit scope checks.",
                 "Delegate business rules to domain services; never embed raw SQL in controllers.",
             ],
         },
         "bdd-step": {
-            "path": "tests/HomePulse.BDD.Tests/Steps/SolarPowerDiversionSteps.cs",
+            "path": "tests/BDD/Steps/SampleFeatureSteps.cs",
             "rules": [
-                "Use Reqnroll (never deprecated TechTalk.SpecFlow).",
-                "Always scope step classes with [Scope(Feature = \"<FeatureName>\")] to prevent step collisions.",
-                "Inject deterministic TimeProvider / IClock so multi-minute windows execute in milliseconds.",
+                "Always scope step classes strictly to their feature to prevent global step collisions.",
+                "Inject a deterministic virtual clock / time provider so time-window tests run in milliseconds.",
             ],
         },
-        "react-widget": {
-            "path": "src/HomePulse.Web/src/components/SolarEcoBanner.tsx",
+        "ui-widget": {
+            "path": "src/Web/src/components/SampleWidget.tsx",
             "rules": [
-                "Keep components focused (<= 2 top-level TypeScript type declarations per file).",
-                "Use native fetch/EventSource; do not import moment or axios.",
+                "Keep UI modules focused (<= 2 top-level type declarations per file).",
+                "Prefer native platform fetch/EventSource over heavy deprecated HTTP clients.",
             ],
         },
     }
@@ -462,7 +461,7 @@ def record_rag_decision(
 if __name__ == "__main__":
     if "--self-test" in sys.argv:
         print(f"Indexed {len(ENGINE.chunks)} chunks from {REPO_ROOT}")
-        sample_bad_cs = "public record SensorReading(string Id);\npublic enum SensorMetricType { Watts, Celsius }"
-        print(validate_code_against_guardrails("src/HomePulse.Domain/Models/SensorReading.cs", sample_bad_cs))
+        sample_bad = "public record OrderItem(string Id);\npublic enum OrderStatus { Pending, Paid }"
+        print(validate_code_against_guardrails("src/Domain/Models/OrderItem.cs", sample_bad))
         sys.exit(0)
     mcp.run()

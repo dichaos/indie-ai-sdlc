@@ -55,7 +55,7 @@ indie-ai-sdlc/
 │   │   ├── docker-compose.observability.yml          # Local Prometheus + Loki + Grafana + postgres-exporter
 │   │   └── prometheus.yml                            # Scrape config for API /metrics & PostgreSQL
 │   └── rules/
-│       └── custom-architecture.yml                   # Semgrep custom rules (device auth scope + integer milliwatts)
+│       └── custom-architecture.yml                   # Semgrep custom rules (auth scope + precision/domain rules)
 └── tests/
     └── test_starter_kit.py                           # Verification suite for AST, hooks, RAG, locks & checkpointing
 ```
@@ -106,7 +106,7 @@ docker compose -f ai-automations/observability/docker-compose.observability.yml 
 ```
 - Prometheus: `http://localhost:9090`
 - Loki: `http://localhost:3100`
-- Grafana: `http://localhost:3000` (`admin` / `homepulse-local`)
+- Grafana: `http://localhost:3000` (`admin` / `local-dev-admin`)
 
 ### 5. Run the Local DevSecOps Gate (Stage 4)
 ```bash

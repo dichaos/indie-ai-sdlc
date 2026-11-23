@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Deterministic Evaluator Harness for the Antigravity Dev Triad (HomePulse).
+"""Deterministic Evaluator Harness for the Antigravity Dev Triad.
 
 Called by Antigravity's `dev-triad` skill during the Evaluator step of each cycle.
 Runs deterministic verification checks that LLMs must never self-report:
 1. Verifies Gate-1 approved `.feature` files were NOT tampered with (SHA-256 lockfile).
-2. Runs Tree-Sitter AST guardrails across all staged/modified `.cs`, `.ts`, `.tsx` files.
+2. Runs Tree-Sitter AST guardrails across all staged/modified source files.
 3. Executes the configured build and BDD/unit test commands.
 4. Outputs structured JSON diagnostics for the Enricher subagent on failure.
 """
@@ -143,12 +143,12 @@ def run_evaluation(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="HomePulse Deterministic Dev Triad Evaluator")
+    parser = argparse.ArgumentParser(description="Deterministic Dev Triad Evaluator")
     parser.add_argument("--repo-root", type=Path, default=Path.cwd(), help="Repository root path")
     parser.add_argument("--lock-feature", type=Path, help="Lock a Gate-1 approved .feature file and exit")
     parser.add_argument("--lock-file", type=Path, default=Path(".agents/triad-gate1.lock.json"))
-    parser.add_argument("--build-cmd", type=str, default="", help="Build command (e.g. 'dotnet build --configuration Release')")
-    parser.add_argument("--test-cmd", type=str, default="", help="Test command (e.g. 'dotnet test --no-build --filter SolarPowerDiversion')")
+    parser.add_argument("--build-cmd", type=str, default="", help="Project build command")
+    parser.add_argument("--test-cmd", type=str, default="", help="Project BDD/unit test command")
     args = parser.parse_args()
 
     if args.lock_feature:

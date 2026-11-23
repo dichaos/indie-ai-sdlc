@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Cross-Platform 3-Minute Local DevSecOps Gate for HomePulse.
+"""Cross-Platform 3-Minute Local DevSecOps Gate.
 
 Runs three deterministic security & verification checks locally for £0.00:
-1. SAST: Ephemeral Docker `semgrep/semgrep` (OWASP Top 10 + custom HomePulse auth/unit rules).
+1. SAST: Ephemeral Docker `semgrep/semgrep` (OWASP Top 10 + custom architecture rules).
 2. DAST: Ephemeral Docker `zaproxy/zap-stable` running `zap-api-scan.py` against OpenAPI spec.
 3. Differential Coverage: `diff-cover` enforcing >= 90% coverage on newly added/modified lines.
 
@@ -147,10 +147,10 @@ def run_diff_coverage(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="HomePulse 3-Minute Local DevSecOps Gate")
+    parser = argparse.ArgumentParser(description="3-Minute Local DevSecOps Gate")
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument("--custom-rules", type=Path, default=Path("src/rules/custom-architecture.yml"))
-    parser.add_argument("--openapi-url", default="http://host.docker.internal:5000/swagger/v1/swagger.json")
+    parser.add_argument("--openapi-url", default="http://host.docker.internal:5000/openapi.json")
     parser.add_argument("--coverage-xml", type=Path, default=Path("reports/coverage.cobertura.xml"))
     parser.add_argument("--compare-branch", default="main")
     parser.add_argument("--min-coverage", type=int, default=90)

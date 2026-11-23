@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-Platform Gapless SRE Telemetry Collector for HomePulse.
+"""Cross-Platform Gapless SRE Telemetry Collector.
 
 Queries local Prometheus, Loki, and PostgreSQL (`pg_stat_statements`) strictly for the
 window `[lastExecutionTimeUtc -> NOW]` tracked in `sre-agent-state.json`.
@@ -74,7 +74,7 @@ def query_prometheus(prometheus_url: str, lookback_seconds: int) -> tuple[Dict[s
     window = f"{max(lookback_seconds, 60)}s"
     queries = {
         "targets_up": "up",
-        "dashboard_p95_latency_ms": (
+        "api_p95_latency_ms": (
             f"histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[{window}])) by (le, route)) * 1000"
         ),
         "http_5xx_rate": f"sum(rate(http_requests_total{{status=~'5..'}}[{window}])) by (service, route)",
@@ -99,7 +99,7 @@ def query_loki(loki_url: str, start: datetime, end: datetime, limit: int = 200) 
     end_ns = int(end.timestamp() * 1_000_000_000)
     params = urllib.parse.urlencode(
         {
-            "query": '{app=~"homepulse.*", level=~"error|critical"}',
+            "query": '{app=~".+", level=~"error|critical"}',
             "start": str(start_ns),
             "end": str(end_ns),
             "limit": str(limit),
@@ -189,9 +189,9 @@ def fetch_snapshot(
     snapshot_path: Path,
     prometheus_url: str = "http://localhost:9090",
     loki_url: str = "http://localhost:3100",
-    pg_container: str = "homepulse-postgres",
-    pg_user: str = "homepulse",
-    pg_db: str = "homepulse",
+    pg_container: str = "app-postgres",
+    pg_user: str = "postgres",
+    pg_db: str = "appdb",
     slow_query_ms: float = 350.0,
     lookback_minutes: int = 30,
 ) -> Dict[str, Any]:
@@ -223,14 +223,14 @@ def fetch_snapshot(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="HomePulse Gapless SRE Telemetry Collector")
+    parser = argparse.ArgumentParser(description="Gapless SRE Telemetry Collector")
     parser.add_argument("--state-file", type=Path, default=DEFAULT_STATE_PATH)
     parser.add_argument("--output", type=Path, default=DEFAULT_SNAPSHOT_PATH)
     parser.add_argument("--prometheus-url", default="http://localhost:9090")
     parser.add_argument("--loki-url", default="http://localhost:3100")
-    parser.add_argument("--pg-container", default="homepulse-postgres")
-    parser.add_argument("--pg-user", default="homepulse")
-    parser.add_argument("--pg-db", default="homepulse")
+    parser.add_argument("--pg-container", default="app-postgres")
+    parser.add_argument("--pg-user", default="postgres")
+    parser.add_argument("--pg-db", default="appdb")
     parser.add_argument("--slow-query-ms", type=float, default=350.0)
     parser.add_argument("--lookback-minutes", type=int, default=30)
     parser.add_argument(
