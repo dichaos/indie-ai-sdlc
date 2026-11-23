@@ -26,13 +26,21 @@ indie-ai-sdlc/
 ├── LICENSE
 ├── requirements.txt                                  # Starter kit dependencies (mcp, tree-sitter, scikit-learn, diff-cover, pytest)
 ├── src/
-│   ├── antigravity/                                  # Ready-to-copy Antigravity Command Centre configs & skills
+│   ├── antigravity/                                  # Ready-to-copy Antigravity Command Centre configs, agents & skills
 │   │   ├── GEMINI.md                                 # Master Stage 0-4 workspace contract (copy to project root)
 │   │   ├── hooks.json                                # PreToolUse AST hook config (copy to .agents/hooks.json)
 │   │   ├── mcp_config.json                           # stdio MCP registration (merge into ~/.gemini/config/mcp_config.json)
+│   │   ├── agents/                                   # Standalone subagent prompt files (copy to .agents/agents/)
+│   │   │   ├── qa-bdd-spec-agent.md                  # QA agent recommending & drafting Gherkin BDD specs
+│   │   │   ├── triad-enricher-agent.md               # Triad 1/3: Read-only RAG grounding & root-cause planner
+│   │   │   ├── triad-fixer-agent.md                  # Triad 2/3: AST-guarded implementation & scoped BDD steps
+│   │   │   ├── triad-evaluator-agent.md              # Triad 3/3: Deterministic verification & escalation gatekeeper
+│   │   │   ├── sre-anomaly-detector-agent.md         # SRE 1/3: Prometheus Golden Signals anomaly detector
+│   │   │   ├── sre-error-log-agent.md                # SRE 2/3: Loki error-log analyst & #ai-ignore filter
+│   │   │   └── sre-slow-query-agent.md               # SRE 3/3: PostgreSQL pg_stat_statements slow-query optimizer
 │   │   └── skills/
-│   │       ├── dev-triad/SKILL.md                    # Bounded Dev Triad runbook + BDD Spec, Enricher & Fixer prompts
-│   │       ├── sre-healer/SKILL.md                   # Branch-gated SRE runbook + SRE Triage subagent prompt
+│   │       ├── dev-triad/SKILL.md                    # Bounded Dev Triad coordinator referencing agents/*.md
+│   │       ├── sre-healer/SKILL.md                   # Branch-gated SRE coordinator referencing sre-*.md
 │   │       └── devsecops-gate/SKILL.md               # Local DevSecOps & #ai-pin / #ai-ignore Living Memory runbook
 │   ├── mcp/
 │   │   ├── hybrid_rag_mcp.py                         # Auto-refreshing SQLite FTS5 + TF-IDF stdio MCP server
@@ -87,7 +95,7 @@ mkdir -p .agents/skills docs/adr docs/decisions ai-automations
 ```
 
 1. **Workspace Rules:** Copy `src/antigravity/GEMINI.md` to `my-project/GEMINI.md`.
-2. **Hooks & Skills:** Copy `src/antigravity/hooks.json` and `src/antigravity/skills/` into `my-project/.agents/`.
+2. **Hooks, Agents & Skills:** Copy `src/antigravity/hooks.json`, `src/antigravity/agents/`, and `src/antigravity/skills/` into `my-project/.agents/`.
 3. **Deterministic Scripts & Docker Configs:** Copy `src/mcp/`, `src/hooks/`, `src/orchestration/`, `src/observability/`, and `src/rules/` into `my-project/ai-automations/`.
 4. **Virtualenv in Project:** Create `.venv` inside `my-project/` and install `requirements.txt`. Update `.agents/hooks.json` to point to `../.venv/bin/python` (macOS/Linux) or `../.venv/Scripts/python.exe` (Windows).
 5. **Register the Local MCP Server:** Merge `src/antigravity/mcp_config.json` into `~/.gemini/config/mcp_config.json` using **absolute paths** for your `.venv` executable, `hybrid_rag_mcp.py`, and `REPO_ROOT`.
