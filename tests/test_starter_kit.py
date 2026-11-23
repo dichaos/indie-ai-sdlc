@@ -164,3 +164,38 @@ def test_fetch_telemetry_crash_safe_checkpointing(tmp_path: Path) -> None:
     assert updated["runsCount"] == 1
     assert "slow_query:orders" in updated["cooldowns"]
     assert load_state(state_file)["lastExecutionTimeUtc"] == snap["windowEndUtc"]
+
+
+def test_one_command_installer_sets_up_agents_skills_mcp_and_sre_automation(tmp_path: Path) -> None:
+    import json
+
+    sys.path.insert(0, str(REPO_ROOT))
+    from install import install_kit  # noqa: E402
+
+    project_dir = tmp_path / "sample-app"
+    gemini_cfg = tmp_path / "gemini-config"
+
+    res = install_kit(
+        target_dir=project_dir,
+        gemini_config_dir=gemini_cfg,
+        install_sre_automation=True,
+        cron_expr="*/30 * * * *",
+        timezone_iana="Europe/London",
+    )
+
+    assert (project_dir / "GEMINI.md").is_file()
+    assert (project_dir / ".agents" / "hooks.json").is_file()
+    assert (project_dir / ".agents" / "skills" / "ai-sdlc" / "SKILL.md").is_file()
+    assert len(list((project_dir / ".agents" / "agents").glob("*.md"))) == 7
+
+    mcp_data = json.loads((gemini_cfg / "mcp_config.json").read_text(encoding="utf-8"))
+    assert "codebase-rag" in mcp_data["mcpServers"]
+    assert mcp_data["mcpServers"]["codebase-rag"]["env"]["REPO_ROOT"] == project_dir.resolve().as_posix()
+
+    sidecar_path = Path(res["sre_sidecar"])
+    assert sidecar_path.is_file()
+    sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    assert sidecar["builtin"] == "schedule"
+    assert sidecar["restart_policy"] == "always"
+    assert sidecar["args"][0] == "CRON_TZ=Europe/London */30 * * * *"
+    assert "--advance-checkpoint" in sidecar["args"][-1]

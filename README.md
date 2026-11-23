@@ -24,13 +24,14 @@ This starter kit separates **LLM reasoning** from **deterministic engineering en
 indie-ai-sdlc/
 ├── README.md
 ├── LICENSE
+├── install.py                                        # One-command installer (agents, skills, hooks, MCP & SRE automation)
 ├── requirements.txt                                  # Starter kit dependencies (mcp, tree-sitter, scikit-learn, diff-cover, pytest)
 ├── src/
 │   ├── antigravity/                                  # Ready-to-copy Antigravity Command Centre configs, agents & skills
-│   │   ├── GEMINI.md                                 # Master Stage 0-4 workspace contract (copy to project root)
-│   │   ├── hooks.json                                # PreToolUse AST hook config (copy to .agents/hooks.json)
-│   │   ├── mcp_config.json                           # stdio MCP registration (merge into ~/.gemini/config/mcp_config.json)
-│   │   ├── agents/                                   # Standalone subagent prompt files (copy to .agents/agents/)
+│   │   ├── GEMINI.md                                 # Master Stage 0-4 workspace contract
+│   │   ├── hooks.json                                # PreToolUse AST hook config
+│   │   ├── mcp_config.json                           # stdio MCP registration template
+│   │   ├── agents/                                   # 7 standalone subagent prompt files
 │   │   │   ├── qa-bdd-spec-agent.md                  # QA agent recommending & drafting Gherkin BDD specs
 │   │   │   ├── triad-enricher-agent.md               # Triad 1/3: Read-only RAG grounding & root-cause planner
 │   │   │   ├── triad-fixer-agent.md                  # Triad 2/3: AST-guarded implementation & scoped BDD steps
@@ -39,6 +40,7 @@ indie-ai-sdlc/
 │   │   │   ├── sre-error-log-agent.md                # SRE 2/3: Loki error-log analyst & #ai-ignore filter
 │   │   │   └── sre-slow-query-agent.md               # SRE 3/3: PostgreSQL pg_stat_statements slow-query optimizer
 │   │   └── skills/
+│   │       ├── ai-sdlc/SKILL.md                      # One-line master pipeline ("Use MyFeature.md through my AI-SDLC")
 │   │       ├── dev-triad/SKILL.md                    # Bounded Dev Triad coordinator referencing agents/*.md
 │   │       ├── sre-healer/SKILL.md                   # Branch-gated SRE coordinator referencing sre-*.md
 │   │       └── devsecops-gate/SKILL.md               # Local DevSecOps & #ai-pin / #ai-ignore Living Memory runbook
@@ -86,61 +88,61 @@ pytest -v
 ```
 All 7 tests should pass before you copy the kit into your project.
 
-### 2. Wire Antigravity Into Your Project Workspace
-Create (or open) your target project folder and copy the starter kit into the exact directories Antigravity auto-discovers:
+### 2. One-Command Install Into Your Project (Files + MCP + Periodic SRE Automation)
+Run **`install.py`** once against your project folder—it automatically installs `GEMINI.md`, all 7 `.agents/agents/*.md` files, all 4 `.agents/skills/*/SKILL.md` skills, OS-patched `.agents/hooks.json`, `ai-automations/`, registers `codebase-rag` in `~/.gemini/config/mcp_config.json`, **and** installs the periodic SRE Antigravity Automation:
 
 ```bash
+# 1. Create your project virtualenv and install starter kit dependencies
 mkdir my-project && cd my-project
 git init
-mkdir -p .agents/skills .agents/agents docs/adr docs/decisions ai-automations
+python3 -m venv .venv
+# macOS / Linux: source .venv/bin/activate   |   Windows: .venv\Scripts\Activate.ps1
+pip install -r /ABS/PATH/TO/indie-ai-sdlc/requirements.txt
+
+# 2. Run the one-command installer (adds all .md files, hooks, MCP & periodic SRE automation)
+python /ABS/PATH/TO/indie-ai-sdlc/install.py \
+  --target . \
+  --install-sre-automation \
+  --timezone Europe/London \
+  --cron "*/30 * * * *"
 ```
 
-1. **Always-On Workspace Contract (`GEMINI.md`):**
-   Copy `src/antigravity/GEMINI.md` to `my-project/GEMINI.md`. Antigravity walks up to `.git` and loads `GEMINI.md` automatically in every session.
-2. **Pre-Write AST Hook, Agents & Skills (`.agents/`):**
-   Copy `src/antigravity/hooks.json`, `src/antigravity/agents/`, and `src/antigravity/skills/` into `my-project/.agents/`.
-3. **Deterministic Helpers (`ai-automations/`):**
-   Copy `src/mcp/`, `src/hooks/`, `src/orchestration/`, `src/observability/`, and `src/rules/` into `my-project/ai-automations/`.
-4. **Create a Project Virtualenv & Update `.agents/hooks.json`:**
-   Install `requirements.txt` inside `my-project/.venv`, then verify `.agents/hooks.json` points `command` at your `.venv` Python binary (`../.venv/bin/python` on macOS/Linux, or `../.venv/Scripts/python.exe` on Windows).
-5. **Register the `codebase-rag` MCP Server Globally:**
-   Merge `src/antigravity/mcp_config.json` into `~/.gemini/config/mcp_config.json` using **absolute paths**:
-   ```json
-   {
-     "mcpServers": {
-       "codebase-rag": {
-         "command": "/ABS/PATH/TO/my-project/.venv/bin/python",
-         "args": ["/ABS/PATH/TO/my-project/ai-automations/mcp/hybrid_rag_mcp.py"],
-         "env": {
-           "REPO_ROOT": "/ABS/PATH/TO/my-project"
-         }
-       }
-     }
-   }
-   ```
-6. **Confirm Discovery in Antigravity:**
-   Open `my-project` in Antigravity and check **Additional Options (`...`) > MCP Servers** to confirm `codebase-rag` is connected (`search_hybrid_rag`, `get_canonical_exemplar`, `validate_code_against_guardrails`, `record_rag_decision`).
+Then open `my-project` in **Antigravity**:
+- Confirm `codebase-rag` is connected under **Additional Options (`...`) > MCP Servers**.
+- Enable **`Periodic SRE Healer (my-project)`** in Antigravity's **Automations** dashboard when you are ready for background SRE monitoring.
 
 ---
 
-## Step 2: Running the Entire AI-SDLC from Antigravity (Command Centre)
+## Step 2: Running the Entire AI-SDLC with One Line in Antigravity
 
-Once wired up, you drive **every stage of the SDLC** directly from the Antigravity chat/CLI—never manually gluing scripts together:
+Drop your project idea or feature description into any Markdown file (for example, `MyFeature.md`) and type **one line** in Antigravity:
 
-| SDLC Stage | Exact Prompt to Type in Antigravity | What Antigravity Coordinates Automatically |
-| :--- | :--- | :--- |
-| **Stage 0: Architecture & Backlog** | `Execute Stage 0 from GEMINI.md for a new project called "<Name>". Here is the problem: <describe problem & constraints>. Pause at Human Gate 0.` | Generates `docs/prd.md`, `docs/adr/001-architecture-and-stack.md`, and `docs/backlog.md`, then halts for your `"approve"`. |
-| **Stage 1: Memory & AST Guardrails** | *(Automatic on every turn)* | Agents query `codebase-rag` (`< 8ms`, auto-refreshing on file changes), while `.agents/hooks.json` physically denies any non-compliant `write_file`/`edit_file` before disk write. |
-| **Stage 2: Autonomous Feature Build** | `Run the dev-triad skill for Feature 01 from docs/backlog.md.` | Spawns `qa-bdd-spec-agent.md` $\rightarrow$ pauses at **Human Gate 1** $\rightarrow$ locks `.feature` SHA-256 $\rightarrow$ loops `triad-enricher-agent.md` $\rightarrow$ `triad-fixer-agent.md` $\rightarrow$ `triad-evaluator-agent.md` (max 5 cycles) $\rightarrow$ pauses at **Human Gate 2** for diff signoff & commit. |
-| **Stage 3: Self-Healing SRE Audit** | `Run the sre-healer skill against our running local stack.` *(or scheduled via `/automation` — see Step 3)* | Collects gapless `[lastExecutionTimeUtc -> NOW]` telemetry $\rightarrow$ fans out in parallel to `sre-anomaly-detector-agent.md`, `sre-error-log-agent.md`, and `sre-slow-query-agent.md` $\rightarrow$ stages fixes on `sre/*` branch $\rightarrow$ pauses at **Human Gate 2** $\rightarrow$ advances checkpoint. |
-| **Stage 4A: 3-Min Local DevSecOps** | `Run the devsecops-gate skill before merging.` | Runs `run_local_devsecops.py` (Semgrep SAST + OWASP ZAP OpenAPI + `diff-cover >= 90%`) and feeds any finding back into `dev-triad`. |
-| **Stage 4B: Living Memory** | `Record this in Living Memory via devsecops-gate: #ai-pin Target: "<Topic>" Rule: "<Rule>" Rationale: "<Why>"` | Calls `record_rag_decision`, writes `docs/decisions/<tag>-<slug>.md`, and re-indexes RAM in `< 2s` for all future subagents. |
+```text
+Use MyFeature.md through my AI-SDLC
+```
+
+Antigravity automatically activates `.agents/skills/ai-sdlc/SKILL.md` and drives `MyFeature.md` end-to-end—**pausing to ask you for input at every Human Gate**:
+1. **Stage 0 $\rightarrow$ Human Gate 0:** Generates/updates `docs/prd.md`, `docs/adr/001-architecture-and-stack.md`, and `docs/backlog.md`, then asks you to approve before any code is written.
+2. **Stage 1 (Automatic):** Grounds every agent via `< 8ms` `codebase-rag` MCP and physically blocks sloppy writes via `.agents/hooks.json`.
+3. **Stage 2A $\rightarrow$ Human Gate 1:** Spawns `qa-bdd-spec-agent.md` to draft plain-English Gherkin scenarios, asks for your approval/refinements, and locks the `.feature` SHA-256 hash.
+4. **Stage 2B (Autonomous Dev Triad, max 5 cycles):** Runs `triad-enricher-agent.md` $\rightarrow$ `triad-fixer-agent.md` $\rightarrow$ `triad-evaluator-agent.md` until 100% green.
+5. **Stage 2C $\rightarrow$ Human Gate 2:** Shows the verified `git diff` + Evaluator report and asks for your approval before committing to Git.
+
+### All Command Centre Shortcuts
+
+| Stage / Action | Simple Prompt in Antigravity |
+| :--- | :--- |
+| **Full Pipeline (Stage 0 $\rightarrow$ Gate 2)** | `Use MyFeature.md through my AI-SDLC` |
+| **Dev Triad Only (Gate 1 $\rightarrow$ Gate 2)** | `Run dev-triad on Feature 02` |
+| **On-Demand SRE Audit** | `Run sre-healer` *(or enable the installed periodic automation)* |
+| **3-Minute Local DevSecOps Gate** | `Run devsecops-gate` |
+| **Teach Living Memory (`#ai-pin` / `#ai-ignore`)** | `Record #ai-pin: <rule> — Rationale: <why>` |
 
 ---
 
-## Step 3: Scheduling Periodic SRE Agents via Antigravity `/automation`
+## Step 3: Periodic SRE Agents (Installed Automatically)
 
-To make the three SRE agents (`sre-anomaly-detector-agent.md`, `sre-error-log-agent.md`, `sre-slow-query-agent.md`) monitor your running app **automatically on a recurring schedule**:
+When you passed `--install-sre-automation` to `install.py`, it wrote the scheduled Antigravity sidecar at `~/.gemini/config/sidecars/sre-healer-<project>/sidecar.json` (you can also customize or create additional schedules anytime via `/automation` inside Antigravity).
 
 ### 1. Start the Local Observability Stack
 ```bash
@@ -150,28 +152,8 @@ docker compose -f ai-automations/observability/docker-compose.observability.yml 
 - Loki: `http://localhost:3100`
 - Grafana: `http://localhost:3000` (`admin` / `local-dev-admin`)
 
-### 2. Create the Recurring Automation Inside Antigravity
-In your project workspace inside Antigravity, type:
-
-```text
-/automation
-```
-
-Antigravity's interactive automation wizard will ask you for:
-1. **Cadence:** Choose **Hourly** (or **Custom cron schedule**, e.g., `*/30 * * * *` for every 30 minutes).
-2. **Timezone / Time:** Confirm your local IANA timezone (e.g., `Europe/London`).
-3. **Self-Contained Task Prompt:** Paste this exact prompt:
-
-```text
-Open the repository at /ABS/PATH/TO/my-project and execute the `sre-healer` skill (`.agents/skills/sre-healer/SKILL.md`):
-
-1. Run `python ai-automations/orchestration/fetch_telemetry.py` WITHOUT `--advance-checkpoint` so telemetry is collected strictly from `lastExecutionTimeUtc` in `ai-automations/sre-agent-state.json` up to NOW (or the last 30m on cold start).
-2. Fan out in parallel to `.agents/agents/sre-anomaly-detector-agent.md`, `.agents/agents/sre-error-log-agent.md`, and `.agents/agents/sre-slow-query-agent.md` against `ai-automations/sre-telemetry-snapshot.json`.
-3. Suppress any signature matching an active `#ai-ignore` rule in `codebase-rag` or listed in `activeCooldowns`.
-4. For any actionable latency breach, slow SQL query, or unhandled Loki error, create a dedicated `sre/<slug>` Git branch and dispatch `dev-triad` to stage a verified fix and regression test (NEVER commit directly to `main`).
-5. Output the Executive SRE Remediation Digest (highlighting any `sre/*` branches ready for Human Gate 2 review).
-6. Only after steps 1-5 succeed cleanly, run `python ai-automations/orchestration/fetch_telemetry.py --advance-checkpoint` (passing `--cooldown-signature <sig>` for any ticketed anomaly) so the next scheduled run resumes from this exact UTC timestamp forward.
-```
+### 2. Enable in Antigravity Automations Dashboard
+Open Antigravity's **Automations** dashboard and enable **`Periodic SRE Healer (<project>)`**. Every scheduled run triggers a fresh Antigravity conversation that runs `fetch_telemetry.py` $\rightarrow$ fans out in parallel to all three SRE agents $\rightarrow$ stages any fix on an isolated `sre/*` branch $\rightarrow$ advances `lastExecutionTimeUtc` only after clean completion.
 
 ### How Gapless Timestamp Tracking Works Across Scheduled Runs
 Each Antigravity `/automation` trigger launches a **brand-new conversation with no memory of prior runs**. `ai-automations/sre-agent-state.json` bridges those runs cleanly:
