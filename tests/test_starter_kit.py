@@ -209,3 +209,24 @@ def test_one_command_installer_sets_up_agents_skills_mcp_and_sre_automation(tmp_
     assert schedules["sre-error-log-agent"] == "CRON_TZ=Europe/London */30 * * * *"
     assert schedules["sre-slow-query-agent"] == "CRON_TZ=Europe/London 0 */6 * * *"
     assert len(state_files) == 3  # Isolated checkpoints prevent race conditions
+
+
+def test_devsecops_sca_config_and_native_audit_override(tmp_path: Path) -> None:
+    import json
+    from run_local_devsecops import load_devsecops_config, run_sca  # noqa: E402
+
+    cfg_file = tmp_path / "devsecops.config.json"
+    cfg_file.write_text(
+        json.dumps({"sca_severity": "CRITICAL", "sca_command": f"{sys.executable} -c \"print('ok')\""}),
+        encoding="utf-8",
+    )
+    cfg = load_devsecops_config(cfg_file)
+    assert cfg["sca_severity"] == "CRITICAL"
+
+    ok_res = run_sca(tmp_path, sca_cmd=cfg["sca_command"], use_trivy=False)
+    assert ok_res["passed"] is True
+    assert ok_res["native_audit"]["passed"] is True
+
+    fail_res = run_sca(tmp_path, sca_cmd=f"{sys.executable} -c \"import sys; sys.exit(1)\"", use_trivy=False)
+    assert fail_res["passed"] is False
+    assert fail_res["native_audit"]["passed"] is False

@@ -1,10 +1,10 @@
 ---
 name: devsecops-gate
 description: >-
-  Runs the 3-minute local Docker DevSecOps gate (Semgrep SAST with custom
-  project rules, OWASP ZAP OpenAPI scan, and diff-cover >= 90% differential coverage),
-  routes findings into dev-triad, and persists human #ai-pin / #ai-ignore review
-  comments into Living Memory via record_rag_decision.
+  Runs the 3-minute local Docker DevSecOps gate (Semgrep SAST, Trivy + optional
+  native package SCA vulnerability audit, OWASP ZAP OpenAPI DAST, and diff-cover
+  >= 90% differential coverage), routes findings into dev-triad, and persists
+  human #ai-pin / #ai-ignore review comments into Living Memory via record_rag_decision.
 ---
 
 # Local DevSecOps & Living Memory Skill
@@ -14,16 +14,18 @@ description: >-
 2. Execute the deterministic local gate:
    ```bash
    python ai-automations/orchestration/run_local_devsecops.py \
+     --config ai-automations/rules/devsecops.config.json \
      --custom-rules ai-automations/rules/custom-architecture.yml \
      --openapi-url http://host.docker.internal:5000/openapi.json \
      --coverage-xml reports/coverage.cobertura.xml \
      --min-coverage 90
    ```
-3. Inspect the JSON report:
+3. Inspect the JSON report across all four gates:
    - **SAST (`semgrep/semgrep`)**: Catches OWASP Top 10 flaws AND custom architectural/security rules from `custom-architecture.yml`.
+   - **SCA / Package Vulnerability Audit (`aquasec/trivy` + optional `sca_command`)**: Automatically scans all dependency manifests and lockfiles across ecosystems for `HIGH`/`CRITICAL` CVEs, and optionally executes your ecosystem's native package-audit CLI configured in `ai-automations/rules/devsecops.config.json`.
    - **DAST (`zaproxy/zap-stable` `zap-api-scan.py`)**: Uses your app's live OpenAPI spec to detect missing security headers (`Content-Security-Policy`, `X-Frame-Options`), permissive CORS, and unauthenticated API responses.
    - **Differential Coverage (`diff-cover`)**: Verifies `>= 90%` line coverage on newly added/modified lines vs `main`.
-4. If `"all_passed": false`, package each finding into a remediation ticket for the **`dev-triad`** skill (creating a security regression test first), then re-run `run_local_devsecops.py` until `"all_passed": true`.
+4. If `"all_passed": false`, package each finding (including vulnerable package upgrades respecting any `#ai-pin` constraints) into a remediation ticket for the **`dev-triad`** skill, then re-run `run_local_devsecops.py` until `"all_passed": true`.
 
 ## Mode 2 — Recording Living Memory (`#ai-pin` / `#ai-ignore`)
 Whenever the human reviewer posts a comment tagged `#ai-pin` or `#ai-ignore`:

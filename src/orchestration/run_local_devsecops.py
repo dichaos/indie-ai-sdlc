@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Cross-Platform 3-Minute Local DevSecOps Gate.
 
-Runs three deterministic security & verification checks locally for £0.00:
+Runs four deterministic security & verification checks locally for £0.00:
 1. SAST: Ephemeral Docker `semgrep/semgrep` (OWASP Top 10 + custom architecture rules).
-2. DAST: Ephemeral Docker `zaproxy/zap-stable` running `zap-api-scan.py` against OpenAPI spec.
-3. Differential Coverage: `diff-cover` enforcing >= 90% coverage on newly added/modified lines.
+2. SCA (Package Vulnerability Scan): Ephemeral Docker `aquasec/trivy` (universal lockfile
+   scanner across ecosystems) PLUS an optional stack-specific `sca_command` configured in
+   `ai-automations/rules/devsecops.config.json` or `--sca-cmd`.
+3. DAST: Ephemeral Docker `zaproxy/zap-stable` running `zap-api-scan.py` against OpenAPI spec.
+4. Differential Coverage: `diff-cover` enforcing >= 90% coverage on newly added/modified lines.
 
 Emits a single JSON summary on stdout that Antigravity's `devsecops-gate` skill reads.
 """
@@ -18,6 +21,18 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
+
+
+def load_devsecops_config(config_path: Path) -> Dict[str, Any]:
+    """Loads optional per-project DevSecOps overrides (e.g., native package audit command)."""
+    if config_path.is_file():
+        try:
+            data = json.loads(config_path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return data
+        except json.JSONDecodeError:
+            pass
+    return {}
 
 
 def run_semgrep(repo_root: Path, custom_rules: Path) -> Dict[str, Any]:
@@ -63,6 +78,85 @@ def run_semgrep(repo_root: Path, custom_rules: Path) -> Dict[str, Any]:
         "findings": findings[:25],
         "stderr": res.stderr[-800:].strip() if res.returncode != 0 else "",
     }
+
+
+def run_sca(
+    repo_root: Path,
+    sca_cmd: str = "",
+    severity: str = "HIGH,CRITICAL",
+    use_trivy: bool = True,
+) -> Dict[str, Any]:
+    """Runs Software Composition Analysis (vulnerable dependency check).
+
+    Uses universal ephemeral Docker `aquasec/trivy` by default and optionally runs a
+    project-configured native package-audit command (`sca_command`).
+    """
+    result: Dict[str, Any] = {
+        "passed": True,
+        "trivy": {"skipped": not use_trivy, "passed": True, "vulnerabilities": []},
+        "native_audit": {"skipped": not bool(sca_cmd), "passed": True},
+    }
+
+    if use_trivy:
+        cmd = [
+            "docker",
+            "run",
+            "--rm",
+            "-v",
+            f"{repo_root.resolve()}:/src:ro",
+            "aquasec/trivy",
+            "fs",
+            "--scanners",
+            "vuln",
+            "--severity",
+            severity,
+            "--exit-code",
+            "1",
+            "--format",
+            "json",
+            "/src",
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        vulns: List[Dict[str, Any]] = []
+        try:
+            parsed = json.loads(res.stdout)
+            for target in parsed.get("Results", []):
+                for v in target.get("Vulnerabilities") or []:
+                    vulns.append(
+                        {
+                            "target": target.get("Target"),
+                            "pkg": v.get("PkgName"),
+                            "installed": v.get("InstalledVersion"),
+                            "fixed": v.get("FixedVersion", ""),
+                            "severity": v.get("Severity"),
+                            "cve": v.get("VulnerabilityID"),
+                        }
+                    )
+        except json.JSONDecodeError:
+            pass
+
+        trivy_passed = res.returncode == 0
+        result["trivy"] = {
+            "passed": trivy_passed,
+            "vulnerability_count": len(vulns),
+            "vulnerabilities": vulns[:25],
+            "stderr": res.stderr[-800:].strip() if not trivy_passed else "",
+        }
+        if not trivy_passed:
+            result["passed"] = False
+
+    if sca_cmd:
+        native_res = subprocess.run(sca_cmd, shell=True, cwd=repo_root, capture_output=True, text=True)
+        native_passed = native_res.returncode == 0
+        result["native_audit"] = {
+            "command": sca_cmd,
+            "passed": native_passed,
+            "output": (native_res.stdout + "\n" + native_res.stderr)[-1500:].strip(),
+        }
+        if not native_passed:
+            result["passed"] = False
+
+    return result
 
 
 def run_zap_api_scan(repo_root: Path, openapi_url: str, reports_dir: Path) -> Dict[str, Any]:
@@ -147,20 +241,37 @@ def run_diff_coverage(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="3-Minute Local DevSecOps Gate")
+    parser = argparse.ArgumentParser(description="3-Minute Local DevSecOps Gate (SAST + SCA + DAST + Diff-Cover)")
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
-    parser.add_argument("--custom-rules", type=Path, default=Path("src/rules/custom-architecture.yml"))
+    parser.add_argument("--config", type=Path, default=Path("ai-automations/rules/devsecops.config.json"))
+    parser.add_argument("--custom-rules", type=Path, default=Path("ai-automations/rules/custom-architecture.yml"))
     parser.add_argument("--openapi-url", default="http://host.docker.internal:5000/openapi.json")
     parser.add_argument("--coverage-xml", type=Path, default=Path("reports/coverage.cobertura.xml"))
     parser.add_argument("--compare-branch", default="main")
     parser.add_argument("--min-coverage", type=int, default=90)
+    parser.add_argument("--sca-cmd", default="", help="Optional stack-specific package audit command")
+    parser.add_argument("--sca-severity", default="HIGH,CRITICAL", help="Trivy severity threshold")
+    parser.add_argument("--skip-sca", action="store_true")
+    parser.add_argument("--skip-trivy", action="store_true")
     parser.add_argument("--skip-dast", action="store_true")
     parser.add_argument("--skip-coverage", action="store_true")
     args = parser.parse_args()
 
+    cfg = load_devsecops_config(args.config)
+    effective_sca_cmd = args.sca_cmd or str(cfg.get("sca_command", "")).strip()
+    effective_severity = str(cfg.get("sca_severity", args.sca_severity))
+
     reports_dir = args.repo_root / "reports"
     summary: Dict[str, Any] = {
         "sast": run_semgrep(args.repo_root, args.custom_rules),
+        "sca": {"skipped": True, "passed": True}
+        if args.skip_sca
+        else run_sca(
+            args.repo_root,
+            sca_cmd=effective_sca_cmd,
+            severity=effective_severity,
+            use_trivy=not args.skip_trivy,
+        ),
         "dast": {"skipped": True, "passed": True}
         if args.skip_dast
         else run_zap_api_scan(args.repo_root, args.openapi_url, reports_dir),
@@ -169,7 +280,8 @@ def main() -> int:
         else run_diff_coverage(args.repo_root, args.coverage_xml, args.compare_branch, args.min_coverage),
     }
     summary["all_passed"] = all(
-        section.get("passed", False) for section in (summary["sast"], summary["dast"], summary["diff_coverage"])
+        section.get("passed", False)
+        for section in (summary["sast"], summary["sca"], summary["dast"], summary["diff_coverage"])
     )
     print(json.dumps(summary, indent=2))
     return 0 if summary["all_passed"] else 1

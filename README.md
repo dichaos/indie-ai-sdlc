@@ -14,7 +14,7 @@ This starter kit separates **LLM reasoning** from **deterministic engineering en
   2. **Physical Pre-Write AST Hook (`src/hooks/pre_write_ast_gate.py`)**: Wired into `.agents/hooks.json` (`PreToolUse` on `write_file|edit_file`) using UTF-8 byte-safe Tree-Sitter AST parsing to deny modularity, banned-import, layer-boundary, and direct-DB violations *before* files touch disk.
   3. **Deterministic Dev Triad Evaluator (`src/orchestration/triad_evaluator.py`)**: Verifies Human Gate 1 `.feature` SHA-256 locks (preventing test tampering), runs Tree-Sitter AST across modified files, and executes your project's build and BDD/unit test commands.
   4. **Crash-Safe Gapless SRE Collector (`src/orchestration/fetch_telemetry.py`)**: Queries local Prometheus, Loki, and PostgreSQL `pg_stat_statements` strictly from **`lastExecutionTimeUtc -> NOW`** persisted in `ai-automations/sre-agent-state.json`, with explicit post-remediation `--advance-checkpoint` and 6-hour per-signature cooldowns.
-  5. **3-Minute Local DevSecOps Gate (`src/orchestration/run_local_devsecops.py`)**: Runs ephemeral Docker `semgrep/semgrep` (OWASP Top 10 + custom rules), `zaproxy/zap-stable` (`zap-api-scan.py` against OpenAPI), and `diff-cover` ($\ge 90\%$ differential coverage on changed lines).
+  5. **3-Minute Local DevSecOps Gate (`src/orchestration/run_local_devsecops.py`)**: Runs ephemeral Docker `semgrep/semgrep` (SAST), `aquasec/trivy` + optional stack-specific package audit via `devsecops.config.json` (SCA), `zaproxy/zap-stable` (`zap-api-scan.py` DAST), and `diff-cover` ($\ge 90\%$ differential coverage on changed lines).
 
 ---
 
@@ -57,7 +57,8 @@ indie-ai-sdlc/
 │   │   ├── docker-compose.observability.yml          # Local Prometheus + Loki + Grafana + postgres-exporter
 │   │   └── prometheus.yml                            # Scrape config for API /metrics & PostgreSQL
 │   └── rules/
-│       └── custom-architecture.yml                   # Semgrep custom rules (auth scope + precision/domain rules)
+│       ├── custom-architecture.yml                   # Semgrep custom rules (auth scope + precision/domain rules)
+│       └── devsecops.config.json                     # Optional per-project native package-audit command (SCA override)
 └── tests/
     └── test_starter_kit.py                           # Verification suite for AST, hooks, RAG, locks & checkpointing
 ```
