@@ -140,9 +140,15 @@ Antigravity automatically activates `.agents/skills/ai-sdlc/SKILL.md` and drives
 
 ---
 
-## Step 3: Periodic SRE Agents (Installed Automatically)
+## Step 3: Custom SRE Agents + 3 Independent Antigravity Automations
 
-When you passed `--install-sre-automation` to `install.py`, it wrote the scheduled Antigravity sidecar at `~/.gemini/config/sidecars/sre-healer-<project>/sidecar.json` (you can also customize or create additional schedules anytime via `/automation` inside Antigravity).
+All three SRE specialists live cleanly as **Custom Agents** under `.agents/agents/`, and passing `--install-sre-automation` to `install.py` installs **three independent scheduled Antigravity Automations**—one per Custom SRE Agent, each with its own isolated `lastExecutionTimeUtc` checkpoint file so they **never race each other** and run at the right operational cadence:
+
+| Antigravity Automation | Custom Agent Executed | Default Cadence | Isolated State Checkpoint |
+| :--- | :--- | :--- | :--- |
+| **`SRE Anomaly Detector (<project>)`** | `.agents/agents/sre-anomaly-detector-agent.md` | Every 30 min (`*/30 * * * *`) | `ai-automations/state/sre-anomaly-state.json` |
+| **`SRE Error Log Analyst (<project>)`** | `.agents/agents/sre-error-log-agent.md` | Every 30 min (`*/30 * * * *`) | `ai-automations/state/sre-error-log-state.json` |
+| **`SRE Slow Query Optimizer (<project>)`** | `.agents/agents/sre-slow-query-agent.md` | Every 6 hours (`0 */6 * * *`) | `ai-automations/state/sre-slow-query-state.json` |
 
 ### 1. Start the Local Observability Stack
 ```bash
@@ -153,7 +159,7 @@ docker compose -f ai-automations/observability/docker-compose.observability.yml 
 - Grafana: `http://localhost:3000` (`admin` / `local-dev-admin`)
 
 ### 2. Enable in Antigravity Automations Dashboard
-Open Antigravity's **Automations** dashboard and enable **`Periodic SRE Healer (<project>)`**. Every scheduled run triggers a fresh Antigravity conversation that runs `fetch_telemetry.py` $\rightarrow$ fans out in parallel to all three SRE agents $\rightarrow$ stages any fix on an isolated `sre/*` branch $\rightarrow$ advances `lastExecutionTimeUtc` only after clean completion.
+Open Antigravity's **Automations** dashboard and enable whichever of the three SRE automations you want running in the background. Because each SRE agent is also a standalone Custom Agent, you can still invoke any of them on demand (e.g., `"Run sre-slow-query-agent"` or `"Run sre-healer"`).
 
 ### How Gapless Timestamp Tracking Works Across Scheduled Runs
 Each Antigravity `/automation` trigger launches a **brand-new conversation with no memory of prior runs**. `ai-automations/sre-agent-state.json` bridges those runs cleanly:

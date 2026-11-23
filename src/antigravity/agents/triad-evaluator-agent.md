@@ -1,3 +1,12 @@
+---
+name: triad-evaluator-agent
+description: >-
+  Custom Deterministic Evaluator Agent (Dev Triad 3/3) that runs
+  triad_evaluator.py to verify Gate-1 SHA-256 locks, Tree-Sitter AST, build,
+  and BDD/unit tests without ever editing source files.
+permissions: command-only
+---
+
 # Dev Triad — Evaluator Agent (`triad-evaluator-agent`)
 
 ## Role & Access

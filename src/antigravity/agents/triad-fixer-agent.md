@@ -1,3 +1,12 @@
+---
+name: triad-fixer-agent
+description: >-
+  Custom Implementation Fixer Agent (Dev Triad 2/3) that executes the Enricher
+  JSON plan to write production code and feature-scoped BDD step definitions,
+  physically guarded by the PreToolUse Tree-Sitter AST hook.
+permissions: write-enabled-ast-guarded
+---
+
 # Dev Triad — Fixer Agent (`triad-fixer-agent`)
 
 ## Role & Access

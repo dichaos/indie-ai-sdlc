@@ -192,10 +192,20 @@ def test_one_command_installer_sets_up_agents_skills_mcp_and_sre_automation(tmp_
     assert "codebase-rag" in mcp_data["mcpServers"]
     assert mcp_data["mcpServers"]["codebase-rag"]["env"]["REPO_ROOT"] == project_dir.resolve().as_posix()
 
-    sidecar_path = Path(res["sre_sidecar"])
-    assert sidecar_path.is_file()
-    sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
-    assert sidecar["builtin"] == "schedule"
-    assert sidecar["restart_policy"] == "always"
-    assert sidecar["args"][0] == "CRON_TZ=Europe/London */30 * * * *"
-    assert "--advance-checkpoint" in sidecar["args"][-1]
+    assert len(res["sre_sidecars"]) == 3
+    schedules = {}
+    state_files = set()
+    for sc in res["sre_sidecars"]:
+        sidecar_path = Path(sc["sidecar_path"])
+        assert sidecar_path.is_file()
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        assert sidecar["builtin"] == "schedule"
+        assert sidecar["restart_policy"] == "always"
+        assert "--advance-checkpoint" in sidecar["args"][-1]
+        schedules[sc["agent"]] = sidecar["args"][0]
+        state_files.add(sc["state_file"])
+
+    assert schedules["sre-anomaly-detector-agent"] == "CRON_TZ=Europe/London */30 * * * *"
+    assert schedules["sre-error-log-agent"] == "CRON_TZ=Europe/London */30 * * * *"
+    assert schedules["sre-slow-query-agent"] == "CRON_TZ=Europe/London 0 */6 * * *"
+    assert len(state_files) == 3  # Isolated checkpoints prevent race conditions

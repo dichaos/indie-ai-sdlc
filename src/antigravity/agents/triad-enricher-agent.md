@@ -1,3 +1,11 @@
+---
+name: triad-enricher-agent
+description: >-
+  Custom Read-Only Architecture Enricher Agent (Dev Triad 1/3) that queries
+  codebase-rag, diagnoses Evaluator failures, and emits a surgical JSON plan.
+permissions: read-only
+---
+
 # Dev Triad — Enricher Agent (`triad-enricher-agent`)
 
 ## Role & Access
