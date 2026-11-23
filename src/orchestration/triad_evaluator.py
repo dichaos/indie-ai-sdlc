@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Deterministic Evaluator Harness for the Antigravity Dev Triad.
 
-Called by Antigravity's `dev-triad` skill during the Evaluator step of each cycle.
+Called by `triad-evaluator-agent` during every Triad cycle.
 Runs deterministic verification checks that LLMs must never self-report:
 1. Verifies Gate-1 approved `.feature` files were NOT tampered with (SHA-256 lockfile).
 2. Runs Tree-Sitter AST guardrails across all staged/modified source files.
-3. Executes the configured build and BDD/unit test commands.
-4. Outputs structured JSON diagnostics for the Enricher subagent on failure.
+3. Executes the project build command.
+4. Executes the targeted feature BDD tests.
+5. Executes the FULL repository regression test suite (`--full-test-cmd` or `full_test_command`
+   in `devsecops.config.json`) so no new change silently breaks existing tests anywhere in the repo.
+6. Outputs structured JSON diagnostics for the Enricher subagent on failure.
 """
 
 from __future__ import annotations
@@ -28,6 +31,17 @@ from ast_parser import audit_source_guardrails
 
 def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def load_pipeline_config(config_path: Path) -> Dict[str, Any]:
+    if config_path.is_file():
+        try:
+            data = json.loads(config_path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return data
+        except json.JSONDecodeError:
+            pass
+    return {}
 
 
 def lock_feature_spec(feature_path: Path, lock_path: Path) -> Dict[str, Any]:
@@ -58,7 +72,7 @@ def verify_feature_lock(lock_path: Path) -> List[str]:
 
 
 def collect_modified_files(repo_root: Path) -> List[Path]:
-    """Returns modified/untracked .cs, .ts, and .tsx files from git status."""
+    """Returns modified/untracked source files from git status."""
     res = subprocess.run(
         ["git", "status", "--porcelain"],
         cwd=repo_root,
@@ -85,6 +99,7 @@ def run_evaluation(
     lock_path: Path | None = None,
     build_cmd: str = "",
     test_cmd: str = "",
+    full_test_cmd: str = "",
     explicit_files: List[Path] | None = None,
 ) -> Dict[str, Any]:
     report: Dict[str, Any] = {
@@ -93,9 +108,11 @@ def run_evaluation(
         "ast_passed": True,
         "build_passed": True,
         "tests_passed": True,
+        "full_suite_passed": True,
         "violations": [],
         "build_output": "",
         "test_output": "",
+        "full_suite_output": "",
     }
 
     # 1. Verify Human Gate 1 .feature immutability
@@ -130,12 +147,20 @@ def run_evaluation(
             report["build_passed"] = False
             return report
 
-    # 4. Unit & BDD test execution (if provided)
+    # 4. Feature-level BDD / unit test execution (if provided)
     if test_cmd:
         test_res = subprocess.run(test_cmd, shell=True, cwd=repo_root, capture_output=True, text=True)
         report["test_output"] = (test_res.stdout + "\n" + test_res.stderr)[-2500:].strip()
         if test_res.returncode != 0:
             report["tests_passed"] = False
+            return report
+
+    # 5. Full repository regression test suite (reads & runs ALL tests in the repo)
+    if full_test_cmd:
+        full_res = subprocess.run(full_test_cmd, shell=True, cwd=repo_root, capture_output=True, text=True)
+        report["full_suite_output"] = (full_res.stdout + "\n" + full_res.stderr)[-2500:].strip()
+        if full_res.returncode != 0:
+            report["full_suite_passed"] = False
             return report
 
     report["all_green"] = True
@@ -145,10 +170,12 @@ def run_evaluation(
 def main() -> int:
     parser = argparse.ArgumentParser(description="Deterministic Dev Triad Evaluator")
     parser.add_argument("--repo-root", type=Path, default=Path.cwd(), help="Repository root path")
+    parser.add_argument("--config", type=Path, default=Path("ai-automations/rules/devsecops.config.json"))
     parser.add_argument("--lock-feature", type=Path, help="Lock a Gate-1 approved .feature file and exit")
     parser.add_argument("--lock-file", type=Path, default=Path(".agents/triad-gate1.lock.json"))
     parser.add_argument("--build-cmd", type=str, default="", help="Project build command")
-    parser.add_argument("--test-cmd", type=str, default="", help="Project BDD/unit test command")
+    parser.add_argument("--test-cmd", type=str, default="", help="Feature BDD/unit test command")
+    parser.add_argument("--full-test-cmd", type=str, default="", help="Full repository regression test suite command")
     args = parser.parse_args()
 
     if args.lock_feature:
@@ -156,11 +183,17 @@ def main() -> int:
         print(json.dumps({"status": "locked", **data}, indent=2))
         return 0
 
+    cfg = load_pipeline_config(args.config)
+    build_cmd = args.build_cmd or str(cfg.get("build_command", "")).strip()
+    test_cmd = args.test_cmd or str(cfg.get("feature_test_command", "")).strip()
+    full_test_cmd = args.full_test_cmd or str(cfg.get("full_test_command", "")).strip()
+
     report = run_evaluation(
         repo_root=args.repo_root,
         lock_path=args.lock_file if args.lock_file.is_file() else None,
-        build_cmd=args.build_cmd,
-        test_cmd=args.test_cmd,
+        build_cmd=build_cmd,
+        test_cmd=test_cmd,
+        full_test_cmd=full_test_cmd,
     )
     print(json.dumps(report, indent=2))
     return 0 if report["all_green"] else 1

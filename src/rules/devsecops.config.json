@@ -1,4 +1,7 @@
 {
+  "build_command": "",
+  "feature_test_command": "",
+  "full_test_command": "",
   "sca_severity": "HIGH,CRITICAL",
   "sca_command": ""
 }

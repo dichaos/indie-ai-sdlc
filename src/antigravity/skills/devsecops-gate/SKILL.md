@@ -1,33 +1,40 @@
 ---
 name: devsecops-gate
 description: >-
-  Runs the 3-minute local Docker DevSecOps gate (Semgrep SAST, Trivy + optional
-  native package SCA vulnerability audit, OWASP ZAP OpenAPI DAST, and diff-cover
-  >= 90% differential coverage), routes findings into dev-triad, and persists
-  human #ai-pin / #ai-ignore review comments into Living Memory via record_rag_decision.
+  Runs Stage 4 DAST (via Custom Agent sec-dast-agent.md using OWASP ZAP OpenAPI
+  scanning against the running local app), optionally re-runs SAST/SCA via
+  sec-sast-sca-agent.md, routes findings into dev-triad, and persists human
+  #ai-pin / #ai-ignore review comments into Living Memory via record_rag_decision.
 ---
 
-# Local DevSecOps & Living Memory Skill
+# Stage 4 — Local DAST & Living Memory Skill
 
-## Mode 1 — 3-Minute Local DevSecOps Gate
-1. Ensure your application is running locally (`http://localhost:5000`) and Cobertura coverage XML has been generated (`reports/coverage.cobertura.xml`).
-2. Execute the deterministic local gate:
+## Custom Security Agent Files
+- **Inside-Triad Static Security & Library SCA Agent:** [sec-sast-sca-agent.md](../../agents/sec-sast-sca-agent.md) *(runs automatically inside `dev-triad` before Human Gate 2)*
+- **Stage 4 Live DAST Agent:** [sec-dast-agent.md](../../agents/sec-dast-agent.md) *(runs against your live local app)*
+
+## Mode 1 — Stage 4 DAST (Live Running Application)
+1. Ensure your application is running locally (`http://localhost:5000`) and serving its OpenAPI spec (`http://host.docker.internal:5000/openapi.json`).
+2. Load [sec-dast-agent.md](../../agents/sec-dast-agent.md) and spawn the **Stage 4 DAST Subagent** to execute:
    ```bash
    python ai-automations/orchestration/run_local_devsecops.py \
-     --config ai-automations/rules/devsecops.config.json \
-     --custom-rules ai-automations/rules/custom-architecture.yml \
-     --openapi-url http://host.docker.internal:5000/openapi.json \
-     --coverage-xml reports/coverage.cobertura.xml \
-     --min-coverage 90
+     --skip-sast --skip-sca --skip-coverage \
+     --openapi-url http://host.docker.internal:5000/openapi.json
    ```
-3. Inspect the JSON report across all four gates:
-   - **SAST (`semgrep/semgrep`)**: Catches OWASP Top 10 flaws AND custom architectural/security rules from `custom-architecture.yml`.
-   - **SCA / Package Vulnerability Audit (`aquasec/trivy` + optional `sca_command`)**: Automatically scans all dependency manifests and lockfiles across ecosystems for `HIGH`/`CRITICAL` CVEs, and optionally executes your ecosystem's native package-audit CLI configured in `ai-automations/rules/devsecops.config.json`.
-   - **DAST (`zaproxy/zap-stable` `zap-api-scan.py`)**: Uses your app's live OpenAPI spec to detect missing security headers (`Content-Security-Policy`, `X-Frame-Options`), permissive CORS, and unauthenticated API responses.
-   - **Differential Coverage (`diff-cover`)**: Verifies `>= 90%` line coverage on newly added/modified lines vs `main`.
-4. If `"all_passed": false`, package each finding (including vulnerable package upgrades respecting any `#ai-pin` constraints) into a remediation ticket for the **`dev-triad`** skill, then re-run `run_local_devsecops.py` until `"all_passed": true`.
+3. If `dast.passed` is `false`, feed the actionable alerts back into **`dev-triad`** (which adds a security regression test, applies the fix, re-runs full repo tests + SAST/SCA, and pauses at Human Gate 2), then re-run Stage 4 DAST until green.
 
-## Mode 2 — Recording Living Memory (`#ai-pin` / `#ai-ignore`)
+## Mode 2 — On-Demand Full 4-Pillar Audit (SAST + SCA + DAST + Diff-Cover)
+Run all four gates together anytime:
+```bash
+python ai-automations/orchestration/run_local_devsecops.py \
+  --config ai-automations/rules/devsecops.config.json \
+  --custom-rules ai-automations/rules/custom-architecture.yml \
+  --openapi-url http://host.docker.internal:5000/openapi.json \
+  --coverage-xml reports/coverage.cobertura.xml \
+  --min-coverage 90
+```
+
+## Mode 3 — Recording Living Memory (`#ai-pin` / `#ai-ignore`)
 Whenever the human reviewer posts a comment tagged `#ai-pin` or `#ai-ignore`:
 1. Call MCP tool `record_rag_decision(tag_type, target, rule_summary, rationale)` on `codebase-rag`.
 2. Confirm the created file in `docs/decisions/` and the updated chunk count.

@@ -251,6 +251,7 @@ def main() -> int:
     parser.add_argument("--min-coverage", type=int, default=90)
     parser.add_argument("--sca-cmd", default="", help="Optional stack-specific package audit command")
     parser.add_argument("--sca-severity", default="HIGH,CRITICAL", help="Trivy severity threshold")
+    parser.add_argument("--skip-sast", action="store_true")
     parser.add_argument("--skip-sca", action="store_true")
     parser.add_argument("--skip-trivy", action="store_true")
     parser.add_argument("--skip-dast", action="store_true")
@@ -263,7 +264,9 @@ def main() -> int:
 
     reports_dir = args.repo_root / "reports"
     summary: Dict[str, Any] = {
-        "sast": run_semgrep(args.repo_root, args.custom_rules),
+        "sast": {"skipped": True, "passed": True}
+        if args.skip_sast
+        else run_semgrep(args.repo_root, args.custom_rules),
         "sca": {"skipped": True, "passed": True}
         if args.skip_sca
         else run_sca(

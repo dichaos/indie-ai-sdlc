@@ -57,23 +57,25 @@ Execute the complete lifecycle below in order, **always pausing to ask the user 
 
 ## Stage 2B — Bounded Autonomous Dev Triad Loop (Max 5 Cycles)
 Repeat for `cycle = 1..5`:
-1. **Enricher Subagent (Read-Only):** Spawn using `.agents/agents/triad-enricher-agent.md`, passing the locked `.feature` path and any `last_failure_diagnostics` from the previous cycle. Receives a JSON implementation plan.
+1. **Enricher Subagent (Read-Only):** Spawn using `.agents/agents/triad-enricher-agent.md`, passing the locked `.feature` path and any `last_failure_diagnostics` from the previous cycle. Queries `codebase-rag` (including indexed `tests/` specs & suites) and outputs a JSON implementation plan.
 2. **Fixer Subagent (Write-Enabled):** Spawn using `.agents/agents/triad-fixer-agent.md`, passing the Enricher's JSON plan and locked `.feature` path.
-3. **Evaluator Subagent (Deterministic Gatekeeper):** Spawn using `.agents/agents/triad-evaluator-agent.md` to execute `triad_evaluator.py` with the build and test commands from `docs/adr/001-architecture-and-stack.md`.
-4. If `"all_green": true`, exit the loop and proceed to **Human Gate 2**.
-5. If `"all_green": false` and `cycle < 5`, pass `last_failure_diagnostics` to the Enricher for Cycle `cycle + 1`.
-6. If Cycle 5 fails, write `reports/triad/escalation-report.md` and **STOP** to ask the user for guidance.
+3. **Evaluator Subagent (Build + Feature BDD + Full Repo Tests):** Spawn using `.agents/agents/triad-evaluator-agent.md` to execute `triad_evaluator.py` (verifying Gate-1 SHA-256 lock, AST, build, feature BDD tests, AND the **full repository regression test suite**). If `"all_green": false`, feed diagnostics back to Cycle `cycle + 1`.
+4. **Static Security & Library SCA Subagent (Inside the Loop):** Spawn using `.agents/agents/sec-sast-sca-agent.md` to run `run_local_devsecops.py --skip-dast` (Semgrep SAST + Trivy/native Library SCA + `diff-cover`).
+   - If `"all_passed": true`, exit the loop and proceed to **Human Gate 2**.
+   - If `"all_passed": false` and `cycle < 5`, feed the exact SAST findings, vulnerable package CVEs, or uncovered lines back to the **Enricher** as `last_failure_diagnostics` for Cycle `cycle + 1`.
+5. If Cycle 5 fails, write `reports/triad/escalation-report.md` and **STOP** to ask the user for guidance.
 
 ---
 
 ## Stage 2C — Verified Diff Signoff (Human Gate 2)
 1. Run `git diff --stat` and `git diff` and summarize:
    - Autonomous Triad cycles used
-   - Gate-1 `.feature` SHA-256 integrity status & Tree-Sitter AST audit status
-   - Build & BDD/unit test results
+   - Gate-1 `.feature` SHA-256 integrity & Tree-Sitter AST status
+   - Feature BDD + **Full Repository Regression Test Suite** status
+   - **Semgrep SAST + Library SCA (Trivy/native) + Differential Coverage** status
 2. **🛑 PAUSE AT HUMAN GATE 2 — Ask the User for Input:**
    Ask the user:
    - **Approve diff & commit to Git**
    - **Request revisions (re-enter Triad loop with feedback & optionally record `#ai-pin`)**
    - **Abort (leave changes uncommitted in working tree)**
-3. Only after explicit user approval, commit cleanly to Git.
+3. Only after explicit user approval, commit cleanly to Git. (Once running locally, run **Stage 4 DAST** via `Run Stage 4 DAST` / `sec-dast-agent.md`.)

@@ -114,6 +114,18 @@ class HybridRagEngine:
                     ):
                         files.append((Path(root) / fname, "code-symbol"))
 
+        # Index repository tests & BDD .feature files so QA & Enricher agents can read all existing tests
+        tests_dir = self.repo_root / "tests"
+        if tests_dir.is_dir():
+            for root, dirs, fnames in os.walk(tests_dir):
+                dirs[:] = [d for d in dirs if d not in PRUNED_DIRS and not d.startswith(".")]
+                for fname in sorted(fnames):
+                    fpath = Path(root) / fname
+                    if fname.endswith(".feature"):
+                        files.append((fpath, "test-spec"))
+                    elif fname.endswith((".cs", ".ts", ".tsx", ".py")) and not fname.endswith((".feature.cs", ".g.cs")):
+                        files.append((fpath, "test-suite"))
+
         return files
 
     def _compute_fingerprint(self, files: List[Tuple[Path, str]]) -> Dict[str, float]:

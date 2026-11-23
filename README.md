@@ -31,11 +31,13 @@ indie-ai-sdlc/
 │   │   ├── GEMINI.md                                 # Master Stage 0-4 workspace contract
 │   │   ├── hooks.json                                # PreToolUse AST hook config
 │   │   ├── mcp_config.json                           # stdio MCP registration template
-│   │   ├── agents/                                   # 7 standalone subagent prompt files
+│   │   ├── agents/                                   # 9 standalone Custom Agent prompt files
 │   │   │   ├── qa-bdd-spec-agent.md                  # QA agent recommending & drafting Gherkin BDD specs
-│   │   │   ├── triad-enricher-agent.md               # Triad 1/3: Read-only RAG grounding & root-cause planner
-│   │   │   ├── triad-fixer-agent.md                  # Triad 2/3: AST-guarded implementation & scoped BDD steps
-│   │   │   ├── triad-evaluator-agent.md              # Triad 3/3: Deterministic verification & escalation gatekeeper
+│   │   │   ├── triad-enricher-agent.md               # Triad 1/4: Read-only RAG grounding & root-cause planner
+│   │   │   ├── triad-fixer-agent.md                  # Triad 2/4: AST-guarded implementation & scoped BDD steps
+│   │   │   ├── triad-evaluator-agent.md              # Triad 3/4: Gate-1 lock, AST, build, feature BDD & full repo tests
+│   │   │   ├── sec-sast-sca-agent.md                 # Triad 4/4: Semgrep SAST + Trivy/native Library SCA + diff-cover
+│   │   │   ├── sec-dast-agent.md                     # Stage 4: Live OWASP ZAP OpenAPI DAST agent
 │   │   │   ├── sre-anomaly-detector-agent.md         # SRE 1/3: Prometheus Golden Signals anomaly detector
 │   │   │   ├── sre-error-log-agent.md                # SRE 2/3: Loki error-log analyst & #ai-ignore filter
 │   │   │   └── sre-slow-query-agent.md               # SRE 3/3: PostgreSQL pg_stat_statements slow-query optimizer
@@ -126,8 +128,9 @@ Antigravity automatically activates `.agents/skills/ai-sdlc/SKILL.md` and drives
 1. **Stage 0 $\rightarrow$ Human Gate 0:** Generates/updates `docs/prd.md`, `docs/adr/001-architecture-and-stack.md`, and `docs/backlog.md`, then asks you to approve before any code is written.
 2. **Stage 1 (Automatic):** Grounds every agent via `< 8ms` `codebase-rag` MCP and physically blocks sloppy writes via `.agents/hooks.json`.
 3. **Stage 2A $\rightarrow$ Human Gate 1:** Spawns `qa-bdd-spec-agent.md` to draft plain-English Gherkin scenarios, asks for your approval/refinements, and locks the `.feature` SHA-256 hash.
-4. **Stage 2B (Autonomous Dev Triad, max 5 cycles):** Runs `triad-enricher-agent.md` $\rightarrow$ `triad-fixer-agent.md` $\rightarrow$ `triad-evaluator-agent.md` until 100% green.
-5. **Stage 2C $\rightarrow$ Human Gate 2:** Shows the verified `git diff` + Evaluator report and asks for your approval before committing to Git.
+4. **Stage 2B (Autonomous Dev Triad + Full Repo Tests + SAST/SCA, max 5 cycles):** Runs `triad-enricher-agent.md` $\rightarrow$ `triad-fixer-agent.md` $\rightarrow$ `triad-evaluator-agent.md` (AST + build + feature BDD + **all existing repo tests**) $\rightarrow$ `sec-sast-sca-agent.md` (**Semgrep SAST + Trivy/native Library SCA + `diff-cover`**) until 100% green.
+5. **Stage 2C $\rightarrow$ Human Gate 2:** Shows the verified `git diff`, full test summary, and SAST/SCA verdict, then asks for your approval before committing to Git.
+6. **Stage 4 (Live DAST):** Once running locally, run `Run Stage 4 DAST` (`sec-dast-agent.md`) to scan your live OpenAPI surface with OWASP ZAP.
 
 ### All Command Centre Shortcuts
 

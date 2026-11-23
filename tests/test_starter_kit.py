@@ -186,7 +186,7 @@ def test_one_command_installer_sets_up_agents_skills_mcp_and_sre_automation(tmp_
     assert (project_dir / "GEMINI.md").is_file()
     assert (project_dir / ".agents" / "hooks.json").is_file()
     assert (project_dir / ".agents" / "skills" / "ai-sdlc" / "SKILL.md").is_file()
-    assert len(list((project_dir / ".agents" / "agents").glob("*.md"))) == 7
+    assert len(list((project_dir / ".agents" / "agents").glob("*.md"))) == 9
 
     mcp_data = json.loads((gemini_cfg / "mcp_config.json").read_text(encoding="utf-8"))
     assert "codebase-rag" in mcp_data["mcpServers"]
@@ -230,3 +230,25 @@ def test_devsecops_sca_config_and_native_audit_override(tmp_path: Path) -> None:
     fail_res = run_sca(tmp_path, sca_cmd=f"{sys.executable} -c \"import sys; sys.exit(1)\"", use_trivy=False)
     assert fail_res["passed"] is False
     assert fail_res["native_audit"]["passed"] is False
+
+
+def test_triad_evaluator_runs_full_repo_test_suite_and_rag_indexes_tests(tmp_path: Path) -> None:
+    # 1. Verify RAG indexes tests/ (.feature + test files) so QA & Enricher can read all repo tests
+    tests_dir = tmp_path / "tests" / "features"
+    tests_dir.mkdir(parents=True)
+    (tests_dir / "ExistingAuth.feature").write_text(
+        "Feature: ExistingAuth\n  Scenario: Revoked token rejected\n", encoding="utf-8"
+    )
+    engine = HybridRagEngine(tmp_path)
+    test_hits = engine.search_hybrid("Revoked token rejected ExistingAuth", top_k=3)
+    assert any("ExistingAuth.feature" in h["path"] for h in test_hits)
+
+    # 2. Verify triad_evaluator catches regressions in the full repo test suite
+    reg_fail = run_evaluation(
+        repo_root=tmp_path,
+        full_test_cmd=f"{sys.executable} -c \"import sys; print('REGRESSION'); sys.exit(1)\"",
+        explicit_files=[],
+    )
+    assert reg_fail["all_green"] is False
+    assert reg_fail["full_suite_passed"] is False
+    assert "REGRESSION" in reg_fail["full_suite_output"]
